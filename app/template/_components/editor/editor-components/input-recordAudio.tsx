@@ -58,7 +58,7 @@ const InputRecordAudioComponent = (props: Props) => {
       return ''
     }
     return props.element.content?.src || ''
-  }, [props.element.content])
+  }, [props.element.content, loading, STATUS, submitted])
 
   const session = useSession()
 

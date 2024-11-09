@@ -25,6 +25,8 @@ interface DashboardData {
   };
   rework: number;
   annotators: number;
+  projects: number;
+  templates: number;
 }
 
 export const dynamic = 'force-dynamic'
@@ -37,6 +39,7 @@ export default function ProjectDashboard() {
       "submittedTasks": 0,
       "statuses": []
     },
+    "rework": 0,
     "projects": 0,
     "templates": 0,
     "annotators": 0

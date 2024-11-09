@@ -11,6 +11,7 @@ import Combobox from "@/components/ui/combobox"
 import { domains, languages, locations } from "@/lib/constants"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Pencil, Building2, CheckCircle2, DollarSign, Clock, Database, FileSpreadsheet, Globe, MapPin } from "lucide-react"
+import MultiCombobox from "@/components/ui/multi-combobox"
 
 interface Option {
   value: string
@@ -27,8 +28,8 @@ export default function AuthPageComponent() {
     role: "",
     name: "",
     phone: "",
-    domain: "",
-    lang: "",
+    domain: [] as string[], 
+    lang: [] as string[],
     location: "",
   })
 
@@ -48,7 +49,7 @@ export default function AuthPageComponent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.role === "annotator") {
-      if (formData.domain === "" || formData.lang === "" || formData.location === "") {
+      if (formData.domain.length === 0 || formData.lang.length === 0 || formData.location === "") {
         toast({
           variant: "destructive",
           title: "Uh oh! Something went wrong.",
@@ -87,7 +88,7 @@ export default function AuthPageComponent() {
       <div className="h-screen flex justify-center items-center">
         <div>
           <h1 className="text-4xl font-bold text-left mb-8">Choose your role</h1>
-          <p className="text-left mb-8 text-muted-foreground">You can't switch roles with the same account</p>
+          <p className="text-left mb-8 text-muted-foreground">You can&apos;t switch roles with the same account</p>
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="cursor-pointer hover:border-primary" onClick={() => handleRoleSelect('annotator')}>
               <CardHeader>
@@ -95,7 +96,7 @@ export default function AuthPageComponent() {
                   <Pencil className="mr-2 h-6 w-6" />
                   Annotator
                 </CardTitle>
-                <CardDescription>I'm ready to earn money</CardDescription>
+                <CardDescription>I&apos;m ready to earn money</CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="mt-4 space-y-2">
@@ -189,7 +190,7 @@ export default function AuthPageComponent() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="domain">Domain</Label>
-                <Combobox
+                <MultiCombobox
                   options={domainOptions}
                   value={formData.domain}
                   onChange={(value) => setFormData({ ...formData, domain: value })}
@@ -199,7 +200,7 @@ export default function AuthPageComponent() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lang">Language</Label>
-                <Combobox
+                <MultiCombobox
                   options={languageOptions}
                   value={formData.lang}
                   onChange={(value) => setFormData({ ...formData, lang: value })}

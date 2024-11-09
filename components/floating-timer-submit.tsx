@@ -15,6 +15,8 @@ export default function Timer() {
   const { dispatch, state, subaccountId, funnelId, pageDetails } = useEditor()
   const { inc, running, setRunning } = useTimer()
   const [time, setTime] = useState(0)
+  const [countdown, setCountdown] = useState(pageDetails.timer || 0)
+  const [isRed, setIsRed] = useState(false)
 
   const router = useRouter()
 
@@ -25,6 +27,15 @@ export default function Timer() {
       interval = setInterval(() => {
         setTime((prevTime) => prevTime + 1)
         inc(1)
+        if (countdown > 0) {
+          setCountdown((prevCountdown: number) => {
+            const newCountdown = prevCountdown - 1
+            if (newCountdown <= pageDetails.timer / 2) {
+              setIsRed(true)
+            }
+            return newCountdown
+          })
+        }
       }, 1000)
     } else if (interval) {
       clearInterval(interval)
@@ -33,14 +44,13 @@ export default function Timer() {
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [running])
-
+  }, [running, countdown, pageDetails.timer])
 
   useEffect(() => {
-    if (!running)
-    toggleTimer()
+    if (!running) {
+      toggleTimer()
+    }
   }, [])
-
 
   const toggleTimer = () => {
     setRunning(!running)
@@ -116,8 +126,8 @@ export default function Timer() {
     <div className="fixed bottom-4 left-[50%] translate-x-[-50%] z-50">
       <Card className="p-3 bg-white border border-gray-200 shadow-lg rounded-full hover:shadow-xl transition-shadow duration-300">
         <div className="flex items-center space-x-3">
-          <div className="text-2xl font-bold font-mono text-black">
-            {formatTime(time)}
+          <div className={`text-2xl font-bold font-mono ${isRed ? 'text-red-500' : 'text-black'}`}>
+            {pageDetails.timer > 0 ? formatTime(countdown) : formatTime(time)}
           </div>
           <Button
             onClick={toggleTimer}

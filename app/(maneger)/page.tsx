@@ -1,21 +1,21 @@
 'use client'
 import { SheetMenu } from "@/components/admin-panel/sheet-menu"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import Loader from '@/components/ui/Loader/Loader'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { format, parseISO } from "date-fns"
+import jsonToCsvExport from "json-to-csv-export"
 import { CalendarIcon, FileDown, PlusCircle, Trash2Icon } from "lucide-react"
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { getAllAcceptedTasks } from "../actions/task"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, } from "@/components/ui/dialog"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import { extractElementDetails, parseAndAddSelectedItemsToArray } from "./export"
-import jsonToCsvExport from "json-to-csv-export"
 
 export interface Project {
   _id: string
@@ -111,7 +111,6 @@ export default function ProjectDashboard() {
   const handledownload = async (e: React.MouseEvent, project: Project) => {
     e.stopPropagation()
     const res = JSON.parse(await getAllAcceptedTasks(project._id))
-    console.log(res)
     if (res.length === 0) {
       toast({
         variant: "destructive",
@@ -128,9 +127,6 @@ export default function ProjectDashboard() {
 
   const handleExport = (format: string) => {
     const exportItems = parseAndAddSelectedItemsToArray(res, selectedItems)
-    // console.log(exportItems)
-    // const exportData = exportItems.filter(item => selectedItems.includes(item.name))
-    // console.log('Exporting:', exportData)
     if (format === 'json') {
 
       const dataStr = JSON.stringify(exportItems, null, 2)
@@ -263,7 +259,7 @@ export default function ProjectDashboard() {
                     <DialogHeader>
                       <DialogTitle>Export Data</DialogTitle>
                       <DialogDescription>
-                        Select the items you want to export. Click export when you're done.
+                        Select the items you want to export. Click export when you&apos;re done.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">

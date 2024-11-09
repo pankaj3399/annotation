@@ -31,8 +31,12 @@ export function TaskDialog({ template, isDialogOpen, setIsDialogOpen, project }:
   useEffect(() => {
     try {
       const content = JSON.parse(template.content)
-      const extractedPlaceholders: Placeholder[] = content[0].content.reduce((acc: Placeholder[], item: any, index: number) => {
-        if (item.type.startsWith('dynamic')) {
+      const extractedPlaceholders: Placeholder[] = []
+      
+      const extractPlaceholders = (item: any) => {
+        if (Array.isArray(item.content)) {
+          item.content.forEach(extractPlaceholders)
+        } else if (item.type && item.type.startsWith('dynamic')) {
           let type: 'text' | 'video' | 'img' | 'audio'
           switch (item.type) {
             case 'dynamicText':
@@ -48,16 +52,17 @@ export function TaskDialog({ template, isDialogOpen, setIsDialogOpen, project }:
               type = 'audio'
               break
             default:
-              return acc
+              return
           }
-          acc.push({
+          extractedPlaceholders.push({
             type,
-            index,
+            index: extractedPlaceholders.length,
             name: item.name
           })
         }
-        return acc
-      }, [])
+      }
+
+      content.forEach(extractPlaceholders)
       setPlaceholders(extractedPlaceholders)
     } catch (error) {
       console.error("Error parsing template content:", error)
@@ -96,17 +101,24 @@ export function TaskDialog({ template, isDialogOpen, setIsDialogOpen, project }:
   const renderFilledTemplate = (values: { [key: string]: string }) => {
     try {
       let content = JSON.parse(template.content)
-      content[0].content = content[0].content.map((item: any, index: number) => {
-        const placeholder = placeholders.find(p => p.index === index)
-        if (placeholder) {
-          if (item.type === 'dynamicText') {
-            item.content.innerText = values[index] || `{{${placeholder.type}}}`
-          } else {
-            item.content.src = values[index] || `{{${placeholder.type}}}`
+      
+      const fillContent = (item: any): any => {
+        if (Array.isArray(item.content)) {
+          return { ...item, content: item.content.map(fillContent) }
+        } else if (item.type && item.type.startsWith('dynamic')) {
+          const placeholder = placeholders.find(p => p.name === item.name)
+          if (placeholder) {
+            if (item.type === 'dynamicText') {
+              return { ...item, content: { ...item.content, innerText: values[placeholder.index] || `{{${placeholder.type}}}` } }
+            } else {
+              return { ...item, content: { ...item.content, src: values[placeholder.index] || `{{${placeholder.type}}}` } }
+            }
           }
         }
         return item
-      })
+      }
+
+      content = content.map(fillContent)
       return JSON.stringify(content)
     } catch (error) {
       console.error("Error rendering filled template:", error)
@@ -156,14 +168,15 @@ export function TaskDialog({ template, isDialogOpen, setIsDialogOpen, project }:
   }
 
   const generateFilledTemplates = async () => {
-    const filledTasks: { project: string, name: string, content: string }[] = []
+    const filledTasks: { project: string, name: string, content: string, timer: number }[] = []
     tasks.forEach((task, taskIndex) => {
       const filled = renderFilledTemplate(task.values)
       for (let i = 0; i < task.count; i++) {
         filledTasks.push({
           project: project._id,
           name: `${project.name} - ${template.name} - ${taskIndex + 1}.${i + 1}`,
-          content: filled
+          content: filled,
+          timer: template.timer
         })
       }
     })

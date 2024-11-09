@@ -1,5 +1,5 @@
 'use client'
-import { upsertTemplate } from '@/app/actions/template'
+import { updateTimer, upsertTemplate } from '@/app/actions/template'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation'
 import { FocusEventHandler, useEffect } from 'react'
 import { toast } from 'sonner'
 import { template } from '../page'
+import { TimeSetterComponent } from '@/components/time-setter'
 
 type Props = {
   pageId: string
@@ -186,6 +187,7 @@ const EditorNavigation = ({
           </Tabs>
         </aside>
         <aside className="flex items-center gap-2">
+          <TimeSetterComponent templateId={pageId} />
           <Button
             variant={'ghost'}
             size={'icon'}

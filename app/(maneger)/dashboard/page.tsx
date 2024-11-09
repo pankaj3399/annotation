@@ -1,14 +1,14 @@
 'use client'
+import { getGlobalDashboard } from '@/app/actions/dashboard'
+import { SheetMenu } from '@/components/admin-panel/sheet-menu'
 import Loader from '@/components/ui/Loader/Loader'
 import { useSession } from 'next-auth/react'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { SheetMenu } from '@/components/admin-panel/sheet-menu'
-import { getGlobalDashboard, getProjectDashboard } from '@/app/actions/dashboard'
-import ChartComponent from './[projectId]/_components/chart'
 import AverageTaskTimeCardComponent from './[projectId]/_components/average-task-time-card'
-import TaskSubmissionChartComponent from './[projectId]/_components/task-submission-chart'
+import ChartComponent from './[projectId]/_components/chart'
 import DashboardOverviewCardComponent from "./[projectId]/_components/dashboard-overview-card"
+import TaskSubmissionChartComponent from './[projectId]/_components/task-submission-chart'
 
 
 export interface Project {
@@ -28,8 +28,6 @@ interface DashboardData {
   templates: number;
   annotators: number;
 }
-
-export const dynamic = 'force-dynamic'
 
 export default function ProjectDashboard() {
   const [data, setData] = useState<DashboardData>({

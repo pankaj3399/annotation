@@ -6,6 +6,7 @@ import Task from "@/models/Task";
 import { getServerSession } from "next-auth";
 import { template } from "../template/page";
 import Rework from '@/models/Rework';
+import { AIJob } from '@/models/aiModel';
 
 export async function updateTask(template: template, _id: string, projectid: string,time:number) {
   await connectToDatabase();
@@ -25,6 +26,7 @@ export async function createTasks(tasks: {
   project: string;
   name: string;
   content: string;
+  timer: number;
 }[]) {
   await connectToDatabase();
   const session = await getServerSession(authOptions);
@@ -51,14 +53,28 @@ export async function getAllAcceptedTasks(projectid: string) {
 
 export async function deleteTask(_id: string) {
   await connectToDatabase();
+  await AIJob.deleteMany({ taskid: _id });
   const res = await Task.deleteOne({ _id });
   return JSON.stringify(res)
 }
 
-export async function changeAnnotator(_id: string, annotator: string) {
+export async function changeAnnotator(_id: string, annotator: string, ai?: boolean) {
   await connectToDatabase();
+  if(ai) {
+    const res = await Task.findOneAndUpdate({ _id }, {
+      annotator: null,
+      ai: annotator
+    },{
+      new: true
+    });
+    return JSON.stringify(res)
+  }
+
   const res = await Task.findOneAndUpdate({ _id }, {
-    annotator
+    annotator,
+    ai: null
+  },{
+    new: true
   });
   return JSON.stringify(res)
 }
@@ -95,7 +111,8 @@ export async function setTaskStatus(_id: string, status: string,feedback?:string
       status,
       timeTaken: 0,
       feedback:'',
-      annotator
+      annotator,
+      ai: false
     })
     return res.status
   }
@@ -104,7 +121,8 @@ export async function setTaskStatus(_id: string, status: string,feedback?:string
       submitted: false,
       status,
       timeTaken: 0,
-      feedback
+      feedback,
+      ai: false
     })
     await Rework.create({
       name:res.name,

@@ -30,17 +30,21 @@ export const authOptions: AuthOptions = {
         await connectToDatabase();
 
         let user = null
-          // logic to salt and hash password
-          const pwHash = saltAndHashPassword(credentials?.password as string);
+        // logic to salt and hash password
+        const pwHash = saltAndHashPassword(credentials?.password as string);
 
-          // logic to verify if the user exists
-          user = await User.findOne({ email: credentials?.email, password: pwHash });
-          if (!user) {
-            // No user found, so this is their first attempt to login
-            // meaning this is also the place you could do registration
-            // throw new Error("User not found.")
-            return null
-          }
+        // logic to verify if the user exists
+        user = await User.findOne({ email: credentials?.email, password: pwHash });
+        if (!user) {
+          // No user found, so this is their first attempt to login
+          // meaning this is also the place you could do registration
+          // throw new Error("User not found.")
+          return null
+        }
+
+        if (user.role == 'annotator') {
+           await User.updateOne({ _id: user._id }, { lastLogin: new Date() });
+        }
 
         return {
           id: user._id.toString(),

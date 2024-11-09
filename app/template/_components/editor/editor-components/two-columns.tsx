@@ -311,7 +311,7 @@ const TwoColumns = (props: Props) => {
           payload: {
             containerId: id,
             elementDetails: {
-              content: { innerText: '' },
+              content: { innerText: '', limit: 10000 },
               id: v4(),
               name: 'input Text',
               styles: { ...defaultStyles, width: '100%' },

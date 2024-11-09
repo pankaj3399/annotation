@@ -20,7 +20,6 @@ export default function AuthPageComponent() {
       password,
       callbackUrl: '/',
     });
-    console.log(res)
 
     if (res?.ok) {
       router.push('/');

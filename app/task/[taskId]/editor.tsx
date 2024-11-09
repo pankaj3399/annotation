@@ -48,7 +48,7 @@ const Editor = ({ pageId, liveMode }: Props) => {
       }
     };
     fetchData()
-  }, [pageId, dispatch])
+  }, [liveMode,pageId, dispatch])
 
   const handleClick = () => {
     dispatch({

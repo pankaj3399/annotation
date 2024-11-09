@@ -1,28 +1,26 @@
 'use client'
 
+import { addJob } from "@/app/actions/aiModel"
 import { getAllAnnotators } from "@/app/actions/annotator"
 import { changeAnnotator, deleteTask, getAllTasks } from "@/app/actions/task"
 import { upsertTemplate } from "@/app/actions/template"
 import { template } from "@/app/template/page"
 import { SheetMenu } from "@/components/admin-panel/sheet-menu"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import Loader from '@/components/ui/Loader/Loader'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import useJobList from "@/hooks/use-jobList"
 import { useToast } from "@/hooks/use-toast"
-import { getStatusBadgeVariant } from "@/lib/constants"
-import { formatTime } from "@/lib/utils"
-import { format, parseISO } from "date-fns"
-import { CalendarIcon, NotebookPen, PlusCircle, Shuffle, Trash2Icon } from "lucide-react"
+import { Bot, PlusCircle, Shuffle } from "lucide-react"
 import { useSession } from 'next-auth/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Judge } from "../../ai-config/[projectId]/page"
+import { TaskTable } from "./table"
+import TaskProgress from "./TaskProgress"
 
-interface Task {
+export interface Task {
   _id: string
   name: string
   project: string
@@ -33,29 +31,48 @@ interface Task {
   annotator?: string
   timeTaken: number
   feedback: string
+  ai: string
 }
 
 export interface Annotator {
   _id: string
   name: string
   email: string
+  lastLogin: string
 }
 
 export default function Component() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTemplateName, setNewTemplateName] = useState('')
   const [annotators, setAnnotators] = useState<Annotator[]>([])
+  const [judges, setJudges] = useState<Judge[]>([])
   const [activeTab, setActiveTab] = useState("all")
+  const { removeJobByTaskid, setJob } = useJobList()
   const pathName = usePathname();
   const projectId = pathName.split("/")[3];
   const router = useRouter();
   const { data: session } = useSession();
   const { toast } = useToast()
 
+  const fetchJudges = async () => {
+    const res = await fetch(`/api/aiModel?projectId=${projectId}`)
+    const judges = await res.json()
+    if (judges.error) {
+      toast({
+        variant: 'destructive',
+        title: 'Fetching judges failed',
+        description: judges.error,
+      })
+      return
+    }
+    setJudges(judges.models.filter((judge: Judge) => judge.enabled == true))
+  }
+  
   useEffect(() => {
     async function init() {
       setTasks(JSON.parse(await getAllTasks(projectId)))
       setAnnotators(JSON.parse(await getAllAnnotators()))
+      fetchJudges()
     }
     init();
   }, [projectId]);
@@ -66,9 +83,9 @@ export default function Component() {
 
   if (session?.user?.role === 'annotator') router.push('/tasks');
 
-  async function handleAssignUser(annotatorId: string, taskId: string) {
-    await changeAnnotator(taskId, annotatorId)
-    setTasks(tasks.map(task => task._id === taskId ? { ...task, annotator: annotatorId } : task))
+  async function handleAssignUser(annotatorId: string, taskId: string, ai: boolean) {
+    const res = JSON.parse(await changeAnnotator(taskId, annotatorId, ai))
+    setTasks(tasks.map(task => task._id === taskId ? res : task))
   }
 
   const handleCreateTemplate = async (e: React.FormEvent) => {
@@ -85,6 +102,7 @@ export default function Component() {
     e.stopPropagation()
     try {
       await deleteTask(_id)
+      removeJobByTaskid(_id)
       setTasks(tasks.filter(project => project._id !== _id))
     } catch (error: any) {
       toast({
@@ -113,7 +131,7 @@ export default function Component() {
       const annotatorIndex = i % annotators.length;
       const annotatorId = annotators[annotatorIndex]._id;
 
-      await changeAnnotator(task._id, annotatorId);
+      await changeAnnotator(task._id, annotatorId, false);
       const taskIndex = updatedTasks.findIndex(t => t._id === task._id);
       updatedTasks[taskIndex] = { ...task, annotator: annotatorId };
     }
@@ -122,6 +140,51 @@ export default function Component() {
     toast({
       title: "Auto-assign completed",
       description: `${unassignedTasks.length} tasks have been assigned.`,
+    });
+  }
+
+  async function handleAssignAI() {
+    const unassignedTasks = tasks.filter(task => !task.annotator && !task.ai && !task.submitted);
+
+    if (unassignedTasks.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "AI assignment failed",
+        description: "No unassigned tasks found.",
+      })
+      return
+    }
+    var judgeIndex = 0;
+    const updatedTasks: Task[] = [...tasks];
+    for (const task of unassignedTasks) {
+      if (!judges[judgeIndex]._id) {
+        toast({
+          variant: "destructive",
+          title: "Fetching judges",
+          description: "Please wait...",
+        })
+        return
+      }
+      const res = await addJob(judges[judgeIndex]._id, task._id, projectId)
+      if (res.error) {
+        toast({
+          variant: "destructive",
+          title: "AI assignment failed",
+          description: res.error,
+        })
+        return
+      }
+      setJob(JSON.parse(res.model as string))
+      await handleAssignUser(judges[judgeIndex]._id, task._id, true)
+      const taskIndex = updatedTasks.findIndex(t => t._id === task._id);
+      updatedTasks[taskIndex] = { ...task, ai: judges[judgeIndex]._id };
+      judgeIndex = (judgeIndex + 1) % judges.length;
+    }
+    setTasks(updatedTasks);
+    toast({
+      title: "AI assigned",
+      description: `${unassignedTasks.length} tasks have been assigned to AI.
+                    Please refresh the page to see the changes.`,
     });
   }
 
@@ -163,148 +226,35 @@ export default function Component() {
         ) : (
           <>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center mb-4 flex-wrap">
                 <TabsList>
                   <TabsTrigger value="all">All Tasks</TabsTrigger>
                   <TabsTrigger value="submitted">Submitted Tasks</TabsTrigger>
                   <TabsTrigger value="unassigned">Unassigned Tasks</TabsTrigger>
                 </TabsList>
-                <Button onClick={handleAutoAssign} variant="outline">
+                <div className="ml-auto mr-2">
+                  <TaskProgress setTasks={setTasks} />
+                </div>
+                {judges.length > 0 && <Button onClick={handleAssignAI} variant="outline" >
+                  <Bot className="mr-2 h-4 w-4" /> Assign Tasks To AI
+                </Button>}
+                <Button onClick={handleAutoAssign} variant="outline" className="ml-2">
                   <Shuffle className="mr-2 h-4 w-4" /> Auto-assign Tasks
                 </Button>
               </div>
               <TabsContent value="all">
-                <TaskTable tasks={filteredTasks.all} annotators={annotators} handleAssignUser={handleAssignUser} handleDeleteTemplate={handleDeleteTemplate} router={router} />
+                <TaskTable setTasks={setTasks}  tasks={filteredTasks.all} annotators={annotators} judges={judges} handleAssignUser={handleAssignUser} handleDeleteTemplate={handleDeleteTemplate} router={router} />
               </TabsContent>
               <TabsContent value="submitted">
-                <TaskTable tasks={filteredTasks.submitted} annotators={annotators} handleAssignUser={handleAssignUser} handleDeleteTemplate={handleDeleteTemplate} router={router} />
+                <TaskTable setTasks={setTasks} tasks={filteredTasks.submitted} annotators={annotators} judges={judges} handleAssignUser={handleAssignUser} handleDeleteTemplate={handleDeleteTemplate} router={router} />
               </TabsContent>
               <TabsContent value="unassigned">
-                <TaskTable tasks={filteredTasks.unassigned} annotators={annotators} handleAssignUser={handleAssignUser} handleDeleteTemplate={handleDeleteTemplate} router={router} />
+                <TaskTable setTasks={setTasks} tasks={filteredTasks.unassigned} annotators={annotators} judges={judges} handleAssignUser={handleAssignUser} handleDeleteTemplate={handleDeleteTemplate} router={router} />
               </TabsContent>
             </Tabs>
           </>
         )}
       </main>
-    </div>
-  )
-}
-
-interface TaskTableProps {
-  tasks: Task[]
-  annotators: Annotator[]
-  handleAssignUser: (annotatorId: string, taskId: string) => void
-  handleDeleteTemplate: (e: React.MouseEvent, _id: string) => void
-  router: any
-}
-
-function TaskTable({ tasks, annotators, handleAssignUser, handleDeleteTemplate, router }: TaskTableProps) {
-  const [dialog, setDialog] = useState(false)
-  const [feedback, setFeedback] = useState('')
-  function handleclick(e: React.MouseEvent,feedback: string) {
-    e.stopPropagation() 
-    setFeedback(feedback)
-    setDialog(true)
-  }
-
-  return (
-    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Tasks Name</TableHead>
-            <TableHead>Created Date</TableHead>
-            <TableHead>Assignee</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-center">Time Taken</TableHead>
-            <TableHead className="text-center">Submitted</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tasks.map((task) => (
-            <TableRow
-              key={task._id}
-              onClick={() => router.push(`/task/${task._id}`)}
-              className="cursor-pointer hover:bg-gray-50"
-            >
-              <TableCell className="font-medium">{task.name}</TableCell>
-              <TableCell>
-                <div className="flex items-center text-sm text-gray-500">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(parseISO(task.created_at), 'PPP')}
-                </div>
-              </TableCell>
-              <TableCell>
-                <Select
-                  value={task.annotator || ""}
-                  onValueChange={(value) => handleAssignUser(value, task._id)}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Assign user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* <SelectItem value="">Unassigned</SelectItem> */}
-                    {annotators.map((user) => (
-                      <SelectItem key={user._id} value={user._id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell className="font-medium">
-                <Badge variant={getStatusBadgeVariant(task.status)}>
-                  {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                </Badge>
-              </TableCell>
-              <TableCell className="font-medium text-center">
-                {formatTime(task.timeTaken)}
-              </TableCell>
-              <TableCell className="font-medium text-center">
-                <span role="img" aria-label={task.submitted ? "Submitted" : "Not submitted"}>
-                  {task.submitted ? '✔️' : '❌'}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-              {task.feedback &&  <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e)=>handleclick(e,task.feedback)}
-                >
-                  <NotebookPen className="h-4 w-4" />
-                  <span className="sr-only">feedback</span>
-                </Button>}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => handleDeleteTemplate(e, task._id)}
-                >
-                  <Trash2Icon className="h-4 w-4" />
-                  <span className="sr-only">Delete</span>
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-        <Dialog open={dialog} onOpenChange={setDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Feedback</DialogTitle>
-              <DialogDescription>
-                {feedback}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="sm:justify-start">
-              <DialogClose asChild>
-                <Button type="button" variant="secondary">
-                  Close
-                </Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </Table>
     </div>
   )
 }
